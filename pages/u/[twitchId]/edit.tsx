@@ -1,32 +1,16 @@
 import * as Cookie from "cookie";
 import { GetServerSideProps } from "next";
-import useSWR from "swr";
-import { until } from "@open-draft/until";
+import { useRouter } from "next/router";
 
 import { TwitchUser, verifyUserToken } from "lib/twitch";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { listRewardsForUser, UserSubReward } from "lib/supabase";
+import { useRewards } from "hooks/useRewards";
 
 type Inputs = {
   subCount: number;
   reward: string;
 };
-
-async function fetcher(route: string) {
-  const [fetchError, response] = await until(() => fetch(route));
-
-  if (fetchError != null || !response.ok) {
-    return [];
-  }
-
-  const [parseError, data] = await until(() => response.json());
-
-  if (parseError != null || data == null) {
-    return [];
-  }
-
-  return data;
-}
 
 interface Props {
   user?: TwitchUser;
@@ -34,8 +18,9 @@ interface Props {
 }
 
 export default function EditGoals(props: Props) {
+  const router = useRouter();
   const { register, handleSubmit } = useForm<Inputs>();
-  const { data, mutate } = useSWR<UserSubReward>("/api/rewards/list", fetcher, {
+  const [data, mutate] = useRewards(router.query.twitchId as string, {
     initialData: props.rewards,
   });
   const onSubmit: SubmitHandler<Inputs> = (data) => {

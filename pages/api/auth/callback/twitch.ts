@@ -5,6 +5,7 @@ import * as Cookie from "cookie";
 
 import * as Supabase from "lib/supabase";
 import * as Twitch from "lib/twitch";
+import { createUserStreamWebhooks } from "utils/createUserStreamWebhooks";
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method !== "GET") {
@@ -29,21 +30,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
 
       if (user == null) {
         await Supabase.addNewUser(twitchUser);
-        if (
-          !(await Supabase.doesUserHaveWebhook(
-            twitchUser,
-            Twitch.TwitchWebhookType.Subscribe
-          ))
-        ) {
-          const subData = await Twitch.createSubscription(
-            access_token,
-            twitchUser.id
-          );
-
-          if (subData) {
-            await Supabase.addNewUserSubscription(twitchUser, subData);
-          }
-        }
+        await createUserStreamWebhooks(twitchUser, access_token);
       }
 
       res.setHeader("access-control-expose-headers", "Set-Cookie");

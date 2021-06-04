@@ -16,6 +16,9 @@ const REDIRECT_URI = encodeURIComponent(
 
 export enum TwitchWebhookType {
   Subscribe = "channel.subscribe",
+  Follow = "channel.follow",
+  Online = "stream.online",
+  Offline = "stream.offline",
 }
 
 export interface TwitchUser {
@@ -91,7 +94,28 @@ export async function verifyUserToken(token: string): Promise<boolean> {
   return validateData.expires_in > 0;
 }
 
-export async function createSubscription(token: string, userId: string) {
+export async function removeWebhookSubscription(
+  token: string,
+  subscriptionId: string
+) {
+  const [deleteRequestError, response] = await until(() =>
+    fetch(`${TWITCH_API_URL}/eventsub/subscriptions?id=${subscriptionId}`, {
+      method: "DELETE",
+      headers: {
+        "Client-ID": process.env.TWITCH_CLIENT_ID!,
+        Authorization: `Bearer ${token}`,
+      },
+    })
+  );
+
+  return deleteRequestError == null && response.ok;
+}
+
+export async function createWebhookSubscription(
+  token: string,
+  userId: string,
+  type: TwitchWebhookType = TwitchWebhookType.Subscribe
+) {
   const [createRequestError, response] = await until(() =>
     fetch(`${TWITCH_API_URL}/eventsub/subscriptions`, {
       method: "POST",
@@ -101,7 +125,7 @@ export async function createSubscription(token: string, userId: string) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        type: TwitchWebhookType.Subscribe,
+        type,
         version: "1",
         condition: {
           broadcaster_user_id: userId,
