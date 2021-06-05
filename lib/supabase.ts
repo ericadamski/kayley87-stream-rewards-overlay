@@ -1,6 +1,6 @@
 import { until } from "@open-draft/until";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { TwitchUser } from "./twitch";
+import type { TwitchUser, TwitchWebhookType } from "./twitch";
 
 let client: SupabaseClient;
 
@@ -13,41 +13,41 @@ export interface User {
   profile_img_url?: string;
 }
 
-export async function addNewUser(user: TwitchUser) {
-  const base = getClientInstance();
-
-  const [error] = await until(async () =>
-    base.from<User>("users").insert([
-      {
-        id: user.id,
-        login: user.login,
-        profile_img_url: user.imageUrl,
-      },
-    ])
-  );
-
-  return error == null;
+export function addNewUser(user: TwitchUser) {
+  return insert<User>("users", {
+    id: user.id,
+    login: user.login,
+    profile_img_url: user.imageUrl,
+  });
 }
 
 interface TwitchWebhookSub {
+  /**
+   * The subscription ID returned from the Twitch API
+   */
   id: string;
-  type: string;
+  sub_type: string;
   user_id: string;
 }
 
-export async function addNewUserWebhookSubscription(
+export function addNewUserWebhookSubscription(
   user: TwitchUser | User,
   hook: Omit<TwitchWebhookSub, "user_id">
 ) {
+  return insert<TwitchWebhookSub>("twitch_webhooks", {
+    ...hook,
+    user_id: user.id,
+  });
+}
+
+export async function removeUserWebhookSubscription(subscriptionId: string) {
   const base = getClientInstance();
 
   const [error] = await until(async () =>
-    base.from<TwitchWebhookSub>("twitch_webhooks").insert([
-      {
-        ...hook,
-        user_id: user.id,
-      },
-    ])
+    base
+      .from<TwitchWebhookSub>("twitch_webhooks")
+      .delete()
+      .eq("id", subscriptionId)
   );
 
   return error == null;
@@ -63,13 +63,32 @@ export async function doesUserHaveWebhook(
     base
       .from<TwitchWebhookSub>("twitch_webhooks")
       .select()
-      .eq("type", type)
+      .eq("sub_type", type)
       .eq("user_id", user.id)
       .single()
   );
 
   if (error != null || record.data == null) {
     return false;
+  }
+
+  return record.data;
+}
+
+export async function listAllWebhooksForUser(
+  userId: (User | TwitchUser)["id"]
+) {
+  const base = getClientInstance();
+
+  const [error, record] = await until(async () =>
+    base
+      .from<TwitchWebhookSub>("twitch_webhooks")
+      .select()
+      .eq("user_id", userId)
+  );
+
+  if (error != null || record.data == null) {
+    return [];
   }
 
   return record.data;
@@ -178,22 +197,18 @@ interface UserLiveStream {
   id: string;
   user_id: string;
   start_time: string;
-  isComplete?: boolean;
+  is_complete?: boolean;
 }
 
 export async function addNewUserLiveStream(
   userId: (TwitchUser | User)["id"],
   streamInfo: Omit<UserLiveStream, "isComplete" | "user_id">
 ) {
-  const base = getClientInstance();
-
-  const [error] = await until(async () =>
-    base
-      .from<UserLiveStream>("live_streams")
-      .insert([{ ...streamInfo, user_id: userId }])
-  );
-
-  return error == null;
+  return insert<UserLiveStream>("live_streams", {
+    ...streamInfo,
+    user_id: userId,
+    is_complete: false,
+  });
 }
 
 export async function markLiveStreamComplete(
@@ -204,9 +219,9 @@ export async function markLiveStreamComplete(
   const [error] = await until(async () =>
     base
       .from<UserLiveStream>("live_streams")
-      .update({ isComplete: true })
+      .update({ is_complete: true })
       .eq("user_id", userId)
-      .eq("isComplete", false)
+      .eq("is_complete", false)
   );
 
   return error == null;
@@ -216,10 +231,12 @@ export async function getCurrentLiveStreamForUserId(userId: string) {
   const base = getClientInstance();
 
   const [error, record] = await until(async () =>
-    base.from<UserLiveStream>("live_streams").select().match({
-      user_id: userId,
-      isComplete: false,
-    })
+    base
+      .from<UserLiveStream>("live_streams")
+      .select()
+      .eq("user_id", userId)
+      .eq("is_complete", false)
+      .single()
   );
 
   if (error != null || record.data == null) {
@@ -229,10 +246,65 @@ export async function getCurrentLiveStreamForUserId(userId: string) {
   return record.data;
 }
 
+interface TwitchUserEvent {
+  id: number;
+  user_id: string;
+  stream_id: string;
+  event_user_id: string;
+  event_user_login: string;
+  event_user_name: string;
+  event_type: TwitchWebhookType;
+}
+
+export function addTwitchUserEvent(
+  userId: string,
+  streamId: string,
+  data: Omit<TwitchUserEvent, "id" | "user_id" | "stream_id">
+) {
+  return insert<TwitchUserEvent, Omit<TwitchUserEvent, "id">>(
+    "twitch_user_events",
+    {
+      ...data,
+      user_id: userId,
+      stream_id: streamId,
+    }
+  );
+}
+
+interface TwitchWebhookLog {
+  id: string;
+  /**
+   * An ISO date string included with the twitch headers
+   */
+  received_at: string;
+}
+
+export function trackRecievedTwitchWebhook(
+  messageId: string,
+  timestamp: string
+) {
+  // TODO: make sure that the ID is unique, so this insert will fail
+  // if we are trying to count a message twice.
+  return insert<TwitchWebhookLog>("twitch_webhook_log", {
+    id: messageId,
+    received_at: timestamp,
+  });
+}
+
 function getClientInstance() {
   if (client == null) {
     client = createClient(supabaseUrl, supabaseKey);
   }
 
   return client;
+}
+
+async function insert<T, D = T>(tableName: string, data: D): Promise<boolean> {
+  const base = getClientInstance();
+
+  const [error] = await until(async () =>
+    base.from<T>(tableName).insert([data])
+  );
+
+  return error == null;
 }

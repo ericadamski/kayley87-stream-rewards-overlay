@@ -32,24 +32,9 @@ export function useRewards(
     initialData?: UserSubReward[];
     refreshInterval?: number;
   }
-): [
-  UserSubReward[],
-  (
-    data?:
-      | UserSubReward[]
-      | Promise<UserSubReward[]>
-      | MutatorCallback<UserSubReward[]>,
-    shouldRevalidate?: boolean
-  ) => Promise<UserSubReward[] | undefined>
-] {
-  const { data, mutate } = useSWR<UserSubReward[]>(
-    ["/api/rewards/list", login],
-    fetcher,
-    {
-      initialData: options?.initialData,
-      refreshInterval: options?.refreshInterval,
-    }
-  );
-
-  return [data ?? [], mutate];
+) {
+  return useSWR<UserSubReward[]>(["/api/rewards/list", login], fetcher, {
+    initialData: options?.initialData,
+    refreshInterval: options?.refreshInterval,
+  });
 }

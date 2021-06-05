@@ -26,7 +26,7 @@ export default function UserPage(props: Props) {
   const [remainingRewards, setRemainingRewards] = useState<UserSubReward[]>(
     props.rewards ?? []
   );
-  const [allRewards] = useRewards(props.user?.login, {
+  const { data: allRewards = [] } = useRewards(props.user?.login, {
     initialData: props.rewards,
     refreshInterval: ms("10s"),
   });

@@ -6,6 +6,7 @@ import { TwitchUser, verifyUserToken } from "lib/twitch";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { listRewardsForUser, UserSubReward } from "lib/supabase";
 import { useRewards } from "hooks/useRewards";
+import { useActiveWebhooks } from "hooks/useActiveWebhooks";
 
 type Inputs = {
   subCount: number;
@@ -17,10 +18,13 @@ interface Props {
   rewards?: UserSubReward[];
 }
 
+// TODO: allow switching between listening on followers and subscribers
+// TODO: make sure user has subs for turning on and off streams
 export default function EditGoals(props: Props) {
   const router = useRouter();
   const { register, handleSubmit } = useForm<Inputs>();
-  const [data, mutate] = useRewards(router.query.twitchId as string, {
+  const { data: activeWebhooks } = useActiveWebhooks(props.user?.id);
+  const { data, mutate } = useRewards(router.query.twitchId as string, {
     initialData: props.rewards,
   });
   const onSubmit: SubmitHandler<Inputs> = (data) => {
@@ -28,16 +32,30 @@ export default function EditGoals(props: Props) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
+    }).then(async (response) => {
+      if (response.ok) {
+        const r = (await response.json()) as UserSubReward;
+
+        mutate((currentData) => [r, ...(currentData ?? [])], true);
+      }
     });
 
-    mutate(
-      (currentData) => [
-        { reward: data.reward, sub_count: data.subCount, id: Date.now() },
-        ...(currentData ?? []),
-      ],
-      true
-    );
+    mutate((currentData) => [
+      {
+        reward: data.reward,
+        sub_count: data.subCount,
+        id: Date.now(),
+        user_id: props.user?.id ?? "",
+      },
+      ...(currentData ?? []),
+    ]);
   };
+
+  console.log(activeWebhooks);
+  // should have at least online and offline subs.
+  //    if one of the above is missing we can update them
+  // then one or none of Subscribe | Follow
+  //    can toggling between these
 
   return (
     <div>

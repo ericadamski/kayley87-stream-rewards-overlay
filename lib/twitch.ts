@@ -155,6 +155,6 @@ export async function createWebhookSubscription(
 
   return {
     id: hook.id,
-    type: hook.type,
+    sub_type: hook.type,
   };
 }

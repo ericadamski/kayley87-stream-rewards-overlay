@@ -1,12 +1,12 @@
 import { TwitchWebhookType } from "./twitch";
 import * as Supabase from "./supabase";
 
-interface Subscription<Type = TwitchWebhookType> {
+interface Subscription<T = TwitchWebhookType> {
   /**
    * The id of the webhook subscription
    */
   id: string;
-  type: Type;
+  type: T;
   version: "1";
   status: "enabled";
   cost: number;
@@ -23,12 +23,21 @@ interface Subscription<Type = TwitchWebhookType> {
   created_at: string;
 }
 
-interface TwitchWebhookEvent<T, Type> {
-  subscription: Subscription<Type>;
+interface WebhookEventData extends Record<string, any> {
+  broadcaster_user_id: string;
+  broadcaster_user_login: string;
+  broadcaster_user_name: string;
+}
+
+export interface TwitchWebhookEvent<
+  T = WebhookEventData,
+  S = TwitchWebhookType
+> {
+  subscription: Subscription<S>;
   event: T;
 }
 
-interface UserStreamOnline {
+interface UserStreamOnline extends WebhookEventData {
   /**
    * Event id
    */
@@ -36,9 +45,6 @@ interface UserStreamOnline {
   /**
    * Twitch user id
    */
-  broadcaster_user_id: string;
-  broadcaster_user_login: string;
-  broadcaster_user_name: string;
   type: "live";
   /**
    * The time the stream started at as an ISO date string.
@@ -55,14 +61,7 @@ export function handleUserStreamOnlineEvent(
   });
 }
 
-interface UserStreamOffline {
-  /**
-   * Twitch user id
-   */
-  broadcaster_user_id: string;
-  broadcaster_user_login: string;
-  broadcaster_user_name: string;
-}
+interface UserStreamOffline extends WebhookEventData {}
 
 export function handleUserStreamOfflineEvent(
   event: TwitchWebhookEvent<UserStreamOffline, TwitchWebhookType.Offline>
@@ -70,13 +69,7 @@ export function handleUserStreamOfflineEvent(
   return Supabase.markLiveStreamComplete(event.event.broadcaster_user_id);
 }
 
-interface UserFollow {
-  /**
-   * Twitch user id
-   */
-  broadcaster_user_id: string;
-  broadcaster_user_login: string;
-  broadcaster_user_name: string;
+interface UserFollow extends WebhookEventData {
   /**
    * Twitch user id of the person who followed
    */
@@ -95,22 +88,22 @@ interface UserFollow {
 export async function handleUserFollowEvent(
   event: TwitchWebhookEvent<UserFollow, TwitchWebhookType.Follow>
 ) {
-  // check to make sure we are live.
-  const currentStream = await Supabase.getCurrentLiveStreamForUserId(
-    event.event.broadcaster_user_id
-  );
+  const userId = event.event.broadcaster_user_id;
+  const currentStream = await Supabase.getCurrentLiveStreamForUserId(userId);
 
-  // if we are, add the follow to the twitch_user_events table with the twitch user info
-  // the current_stream_id and the user_id of the broadcaster and the type of the event.
+  if (currentStream != null) {
+    return Supabase.addTwitchUserEvent(userId, currentStream.id, {
+      event_user_id: event.event.user_id,
+      event_user_login: event.event.user_login,
+      event_user_name: event.event.user_name,
+      event_type: TwitchWebhookType.Follow,
+    });
+  }
+
+  return false;
 }
 
-interface UserSubscribe {
-  /**
-   * Twitch user id
-   */
-  broadcaster_user_id: string;
-  broadcaster_user_login: string;
-  broadcaster_user_name: string;
+interface UserSubscribe extends WebhookEventData {
   /**
    * Twitch user id of the person who followed
    */
@@ -127,7 +120,52 @@ interface UserSubscribe {
 export async function handleUserSubscribeEvent(
   event: TwitchWebhookEvent<UserSubscribe, TwitchWebhookType.Subscribe>
 ) {
-  // check to make sure we are live.
-  // if we are, add the follow to the twitch_user_events table with the twitch user info
-  // the current_stream_id and the user_id of the broadcaster
+  const userId = event.event.broadcaster_user_id;
+  const currentStream = await Supabase.getCurrentLiveStreamForUserId(userId);
+
+  if (currentStream != null) {
+    return Supabase.addTwitchUserEvent(userId, currentStream.id, {
+      event_user_id: event.event.user_id,
+      event_user_login: event.event.user_login,
+      event_user_name: event.event.user_name,
+      event_type: TwitchWebhookType.Subscribe,
+    });
+  }
+
+  return false;
+}
+
+type WebhookEventDataByType = {
+  [TwitchWebhookType.Online]: UserStreamOnline;
+  [TwitchWebhookType.Offline]: UserStreamOffline;
+  [TwitchWebhookType.Follow]: UserFollow;
+  [TwitchWebhookType.Subscribe]: UserSubscribe;
+};
+
+type WebhookEventHandler<D, S> = (
+  event: TwitchWebhookEvent<D, S>
+) => Promise<boolean>;
+
+const EVENT_HANDLERS: {
+  [k in TwitchWebhookType]: WebhookEventHandler<WebhookEventDataByType[k], k>;
+} = {
+  [TwitchWebhookType.Online]: handleUserStreamOnlineEvent,
+  [TwitchWebhookType.Offline]: handleUserStreamOfflineEvent,
+  [TwitchWebhookType.Follow]: handleUserFollowEvent,
+  [TwitchWebhookType.Subscribe]: handleUserSubscribeEvent,
+};
+
+export function handleWebhookEvent(body: TwitchWebhookEvent) {
+  const {
+    subscription: { type },
+  } = body;
+
+  const handler = EVENT_HANDLERS[type];
+
+  if (handler != null) {
+    // @ts-ignore There is a valid type error here, not sure I should fuddle with it?
+    return handler(body);
+  }
+
+  return false;
 }
