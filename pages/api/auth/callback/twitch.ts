@@ -30,7 +30,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
 
       if (user == null) {
         await Supabase.addNewUser(twitchUser);
-        await createUserStreamWebhooks(twitchUser, access_token);
+        await createUserStreamWebhooks(twitchUser);
       }
 
       res.setHeader("access-control-expose-headers", "Set-Cookie");

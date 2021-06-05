@@ -5,12 +5,12 @@ const TWITCH_API_URL = "https://api.twitch.tv/helix";
 
 const BASE_URI =
   process.env.NODE_ENV === "production"
-    ? "https://twitch-rewards.vercel.app"
+    ? "https://stream-rewards.vercel.app"
     : "https://03b6b2d097d9.ngrok.io";
 
 const REDIRECT_URI = encodeURIComponent(
   process.env.NODE_ENV === "production"
-    ? "https://twitch-rewards.vercel.app/auth/twitch"
+    ? "https://stream-rewards.vercel.app/auth/twitch"
     : "http://localhost:3000/auth/twitch"
 );
 
