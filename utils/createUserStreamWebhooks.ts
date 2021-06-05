@@ -1,11 +1,18 @@
 import * as Supabase from "lib/supabase";
 import * as Twitch from "lib/twitch";
+import { getActiveTwitchAppToken } from "./getActiveTwitchAppToken";
 
 export async function createUserStreamWebhooks(
-  twitchUser: Twitch.TwitchUser | Supabase.User,
-  access_token: string
+  twitchUser: Twitch.TwitchUser | Supabase.User
 ): Promise<boolean> {
+  const token = await getActiveTwitchAppToken();
+
+  if (token == null) {
+    return false;
+  }
+
   // Sub to streamer online events
+  // TODO: Maybe user: createTwitchEventSubscription, here?
   if (
     !(await Supabase.doesUserHaveWebhook(
       twitchUser,
@@ -13,12 +20,13 @@ export async function createUserStreamWebhooks(
     ))
   ) {
     const onlineData = await Twitch.createWebhookSubscription(
-      access_token,
+      token,
       twitchUser.id,
       Twitch.TwitchWebhookType.Online
     );
 
     if (!onlineData) {
+      console.log({ onlineData });
       return false;
     }
 
@@ -33,7 +41,7 @@ export async function createUserStreamWebhooks(
     ))
   ) {
     const offlineData = await Twitch.createWebhookSubscription(
-      access_token,
+      token,
       twitchUser.id,
       Twitch.TwitchWebhookType.Offline
     );

@@ -1,6 +1,8 @@
 import { until } from "@open-draft/until";
 import useSWR from "swr";
 
+import type { TwitchWebhookSub } from "lib/supabase";
+
 async function fetcher(route: string, userId?: string) {
   if (userId == null) {
     throw new Error("Require user id to fetch");
@@ -24,5 +26,5 @@ async function fetcher(route: string, userId?: string) {
 }
 
 export function useActiveWebhooks(userId?: string) {
-  return useSWR(["/api/webhooks/list", userId], fetcher);
+  return useSWR<TwitchWebhookSub[]>(["/api/webhooks/list", userId], fetcher);
 }

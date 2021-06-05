@@ -20,6 +20,10 @@ interface Props {
   rewards?: UserSubReward[];
 }
 
+// TODO: we getting the realtime data and potentially refetching on interval
+//  make sure we check the count as a prelime query so we don't exhaust the DB.
+//  OR integrate ably websockets... not sure which one makes more sense. Maybe both?
+
 export default function UserPage(props: Props) {
   const [nextReward, setNextReward] = useState<UserSubReward>();
   const [currentSubCount, setCurrentSubCount] = useState<number>(1000);

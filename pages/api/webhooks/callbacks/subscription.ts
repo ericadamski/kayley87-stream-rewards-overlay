@@ -6,6 +6,13 @@ import type { TwitchWebhookType } from "lib/twitch";
 import { handleWebhookEvent, TwitchWebhookEvent } from "lib/twitch-events";
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
+  // N.B Enable CORS
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "*");
+  if (req.method === "OPTIONS") {
+    return res.end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).end();
   }
@@ -21,8 +28,8 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     return res.status(403).end();
   }
 
-  const messageId = headers["Twitch-Eventsub-Message-Id"] as string;
-  const timestamp = headers["Twitch-Eventsub-Message-Timestamp"] as string;
+  const messageId = headers["twitch-wventsub-message-id"] as string;
+  const timestamp = headers["twitch-eventsub-message-timestamp"] as string;
 
   // Store the record in the DB to make sure we avoid dups.
   const alreadySeen = !(await Supabase.trackRecievedTwitchWebhook(
@@ -34,7 +41,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     return res.end();
   }
 
-  const contentType = headers["Content-Type"];
+  const contentType = headers["content-type"];
 
   if (contentType !== "application/json") {
     return res.status(400).end();
@@ -52,7 +59,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
 
   // Verification for new subscriptions
   if (
-    headers["Twitch-Eventsub-Message-Type"] === "webhook_callback_verification"
+    headers["twitch-eventsub-message-type"] === "webhook_callback_verification"
   ) {
     const {
       challenge,
@@ -85,7 +92,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
   }
 
   // Handle Twith revoking a webhook
-  if (headers["Twitch-Eventsub-Message-Type"] === "revocation") {
+  if (headers["twitch-eventsub-message-type"] === "revocation") {
     const {
       subscription: { id },
     } = bodyAsObj as {
@@ -100,6 +107,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
   }
 
   // Finally handle the notification
+  // N.B Will ignore any events while a stream is offline.
   await handleWebhookEvent(bodyAsObj as TwitchWebhookEvent);
 
   res.end();
@@ -131,12 +139,12 @@ function webhookPayloadParser(req: NextApiRequest): Promise<string> {
 
 // verify header Twitch-Eventsub-Message-Signature
 async function verifyRequestFromTwitch(req: NextApiRequest, body: string) {
-  const twitchMessageId = req.headers["Twitch-Eventsub-Message-Id"] as string;
+  const twitchMessageId = req.headers["twitch-eventsub-message-id"] as string;
   const twitchMessageTimestamp = req.headers[
-    "Twitch-Eventsub-Message-Timestamp"
+    "twitch-eventsub-message-timestamp"
   ] as string;
   const twitchSignatureHeader = req.headers[
-    "Twitch-Eventsub-Message-Signature"
+    "twitch-eventsub-message-signature"
   ] as string;
 
   if (

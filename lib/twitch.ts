@@ -6,7 +6,7 @@ const TWITCH_API_URL = "https://api.twitch.tv/helix";
 const BASE_URI =
   process.env.NODE_ENV === "production"
     ? "https://twitch-rewards.vercel.app"
-    : "http://localhost:3000";
+    : "https://03b6b2d097d9.ngrok.io";
 
 const REDIRECT_URI = encodeURIComponent(
   process.env.NODE_ENV === "production"
@@ -28,8 +28,6 @@ export interface TwitchUser {
   login: string;
 }
 
-// https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types#channelsubscribe
-
 export function getOAuthUrl(state?: string) {
   const scopes = ["user:read:email", "channel:read:subscriptions"];
 
@@ -47,6 +45,39 @@ export function getOAuthToken(code: string) {
       method: "POST",
     }
   );
+}
+
+export async function getAppAccessToken() {
+  const scopes: string[] = ["channel:read:subscriptions"];
+
+  const [error, response] = await until(() =>
+    fetch(
+      `${TWITCH_AUTH_URL}/token?client_id=${
+        process.env.TWITCH_CLIENT_ID
+      }&client_secret=${
+        process.env.TWITCH_CLIENT_SECRET
+      }&grant_type=client_credentials&scope=${encodeURIComponent(
+        scopes.join(" ")
+      )}`,
+      {
+        method: "POST",
+      }
+    )
+  );
+
+  if (error != null) {
+    return undefined;
+  }
+
+  const { access_token, expires_in } = (await response.json()) as {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    scope: string[];
+    token_type: "bearer";
+  };
+
+  return { token: access_token, expiresIn: expires_in };
 }
 
 export function getUser(token: string): Promise<TwitchUser | undefined> {
@@ -121,7 +152,7 @@ export async function createWebhookSubscription(
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
-        Client_ID: process.env.TWITCH_CLIENT_ID!,
+        "Client-ID": process.env.TWITCH_CLIENT_ID!,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -132,7 +163,7 @@ export async function createWebhookSubscription(
         },
         transport: {
           method: "webhook",
-          callback: `${BASE_URI}/webhooks/callbacks/subscription`,
+          callback: `${BASE_URI}/api/webhooks/callbacks/subscription`,
           secret: process.env.SECRET,
         },
       }),
@@ -140,12 +171,22 @@ export async function createWebhookSubscription(
   );
 
   if (createRequestError != null || !response.ok) {
+    console.log({
+      createRequestError,
+      response,
+      b: await response.text(),
+      userId,
+      token,
+      id: process.env.TWITCH_CLIENT_ID,
+      type,
+    });
     return false;
   }
 
   const [parseError, body] = await until(() => response.json());
 
   if (parseError != null || body == null) {
+    console.log({ parseError, body });
     return false;
   }
 

@@ -10,7 +10,7 @@ export async function getUserFromCookies(cookies: NextApiRequest["cookies"]) {
   }
 
   let token = null;
-  let user: Twitch.TwitchUser | null = null;
+  let user: (Twitch.TwitchUser & { token?: string }) | null = null;
 
   try {
     const { t } = JSON.parse(__twtk);
@@ -18,9 +18,11 @@ export async function getUserFromCookies(cookies: NextApiRequest["cookies"]) {
     const u = JSON.parse(__twRw);
     user = u;
 
-    if (t == null || u == null) {
+    if (t == null || user == null) {
       throw new Error("Unauthorized");
     }
+
+    user.token = t;
   } catch {
     throw new Error("Something didn't go well here.");
   }
