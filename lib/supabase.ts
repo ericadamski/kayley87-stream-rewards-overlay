@@ -198,6 +198,33 @@ export async function listRewardsForUser(user: TwitchUser | User) {
   return record.data;
 }
 
+export async function removeAllRewardsForUser(user: TwitchUser | User) {
+  const base = getClientInstance();
+
+  const [error] = await until(async () =>
+    base.from<UserSubReward>("user_rewards").delete().eq("user_id", user.id)
+  );
+
+  return error != null;
+}
+
+export async function removeRewardForUser(
+  user: TwitchUser | User,
+  rewardId: string
+) {
+  const base = getClientInstance();
+
+  const [error] = await until(async () =>
+    base
+      .from<UserSubReward>("user_rewards")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("id", rewardId)
+  );
+
+  return error != null;
+}
+
 export async function listRewardsForTwitchLogin(
   login: (TwitchUser | User)["login"]
 ) {
@@ -224,7 +251,7 @@ export async function listRewardsForTwitchLogin(
   return record.data;
 }
 
-interface UserLiveStream {
+export interface UserLiveStream {
   id: string;
   user_id: string;
   start_time: string;
@@ -277,7 +304,7 @@ export async function getCurrentLiveStreamForUserId(userId: string) {
   return record.data;
 }
 
-interface TwitchUserEvent {
+export interface TwitchUserEvent {
   id: number;
   user_id: string;
   stream_id: string;
@@ -285,12 +312,13 @@ interface TwitchUserEvent {
   event_user_login: string;
   event_user_name: string;
   event_type: TwitchWebhookType;
+  created_at: string;
 }
 
 export function addTwitchUserEvent(
   userId: string,
   streamId: string,
-  data: Omit<TwitchUserEvent, "id" | "user_id" | "stream_id">
+  data: Omit<TwitchUserEvent, "id" | "user_id" | "stream_id" | "created_at">
 ) {
   return insert<TwitchUserEvent, Omit<TwitchUserEvent, "id">>(
     "twitch_user_events",
@@ -298,8 +326,36 @@ export function addTwitchUserEvent(
       ...data,
       user_id: userId,
       stream_id: streamId,
+      created_at: new Date().toISOString(),
     }
   );
+}
+
+export async function getAllUserEventsFor(
+  userId: string,
+  streamId: string,
+  eventType: TwitchWebhookType
+): Promise<{ count: number; latestEvent?: TwitchUserEvent | undefined }> {
+  const base = getClientInstance();
+
+  const [error, records] = await until(async () =>
+    base
+      .from<TwitchUserEvent>("twitch_user_events")
+      .select("*", { count: "exact" })
+      .eq("user_id", userId)
+      .eq("stream_id", streamId)
+      .eq("event_type", eventType)
+      .order("created_at")
+  );
+
+  if (error != null || records.data == null) {
+    return { count: 0 };
+  }
+
+  return {
+    count: records.count ?? 0,
+    latestEvent: records.data.pop(),
+  };
 }
 
 interface TwitchWebhookLog {

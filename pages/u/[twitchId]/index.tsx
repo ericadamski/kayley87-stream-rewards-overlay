@@ -14,6 +14,11 @@ import {
 import { useRewards } from "hooks/useRewards";
 import { getNextReward } from "utils/getNextReward";
 import { sortBy } from "ramda";
+import { useTrackingMetric } from "hooks/useTrackingMetric";
+import { getTwitchEventFriendlyName } from "utils/getTwitchEventFriendlyName";
+import { TwitchWebhookType } from "lib/twitch";
+import { useLiveStreamId } from "hooks/useLiveStream";
+import { useTackCurrentMetric } from "hooks/useTackCurrentMetric";
 
 interface Props {
   user?: User;
@@ -25,8 +30,14 @@ interface Props {
 //  OR integrate ably websockets... not sure which one makes more sense. Maybe both?
 
 export default function UserPage(props: Props) {
+  const trackingMetric = useTrackingMetric(props.user?.id);
+  const streamId = useLiveStreamId(props.user?.id);
+  const [currentMetricCount, lastEvent] = useTackCurrentMetric(
+    props.user?.id,
+    streamId,
+    trackingMetric
+  );
   const [nextReward, setNextReward] = useState<UserSubReward>();
-  const [currentSubCount, setCurrentSubCount] = useState<number>(1000);
   const [remainingRewards, setRemainingRewards] = useState<UserSubReward[]>(
     props.rewards ?? []
   );
@@ -42,10 +53,10 @@ export default function UserPage(props: Props) {
   }, []);
 
   useEffect(() => {
-    const [next, remianing] = getNextReward(currentSubCount, allRewards);
+    const [next, remianing] = getNextReward(currentMetricCount, allRewards);
     setNextReward(next);
     setRemainingRewards(remianing);
-  }, [currentSubCount, allRewards]);
+  }, [currentMetricCount, allRewards]);
 
   if (props.user == null) {
     return null;
@@ -53,7 +64,11 @@ export default function UserPage(props: Props) {
 
   const maxReward = sortBy((r) => r.sub_count, allRewards).pop();
   const singleStep = 1 / (maxReward?.sub_count ?? 1);
-  const progress = currentSubCount * singleStep * 100;
+  const progress = currentMetricCount * singleStep * 100;
+
+  const metricFriendlyName = getTwitchEventFriendlyName(
+    trackingMetric as TwitchWebhookType
+  );
 
   return (
     <ProgressContainer>
@@ -62,24 +77,38 @@ export default function UserPage(props: Props) {
           <>
             <Detail
               style={{
-                top: `${Math.min(
-                  100 - (nextReward?.sub_count ?? 1) * singleStep * 100,
-                  98
+                top: `${Math.max(
+                  Math.min(
+                    100 - (nextReward?.sub_count ?? 1) * singleStep * 100,
+                    98
+                  ),
+                  8
                 )}%`,
                 y: "-100%",
               }}
             >
               <p style={{ fontWeight: "normal", fontSize: "0.5rem" }}>
-                Reward at {nextReward.sub_count} subs:
+                Reward at {nextReward.sub_count}{" "}
+                {metricFriendlyName?.toLowerCase()}:
               </p>
               <p>{nextReward.reward}</p>
+              <p>
+                last{" "}
+                {metricFriendlyName
+                  ?.toLowerCase()
+                  .substr(0, metricFriendlyName.length - 1)}
+                : {lastEvent?.event_user_name}
+              </p>
             </Detail>
             <Line
               rewardAmount={nextReward?.sub_count ?? 1}
               style={{
-                top: `${Math.min(
-                  100 - (nextReward?.sub_count ?? 1) * singleStep * 100,
-                  98
+                top: `${Math.max(
+                  Math.min(
+                    100 - (nextReward?.sub_count ?? 1) * singleStep * 100,
+                    98
+                  ),
+                  2
                 )}%`,
               }}
             />
@@ -87,14 +116,16 @@ export default function UserPage(props: Props) {
         )}
         <Progress
           animate={{
-            height: `${Math.max(16 * singleStep * 100, progress)}%`,
+            height: `${Math.max(4, progress)}%`,
             borderTopLeftRadius: progress === 100 ? "1rem" : undefined,
             borderTopRightRadius: progress === 100 ? "1rem" : undefined,
           }}
         >
           {progress > 0 && (
-            <Detail style={{ minWidth: 100, textAlign: "center" }}>
-              <p>Subs: {currentSubCount}</p>
+            <Detail style={{ minWidth: 120, textAlign: "center" }}>
+              <p>
+                {metricFriendlyName}: {currentMetricCount}
+              </p>
             </Detail>
           )}
         </Progress>

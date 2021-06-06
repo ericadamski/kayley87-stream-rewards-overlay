@@ -13,6 +13,7 @@ import {
 } from "lib/supabase";
 import { useRewards } from "hooks/useRewards";
 import { useActiveWebhooks } from "hooks/useActiveWebhooks";
+import { getTwitchEventFriendlyName } from "utils/getTwitchEventFriendlyName";
 
 type Inputs = {
   subCount: number;
@@ -128,6 +129,24 @@ export default function EditGoals(props: Props) {
     mutateActiveWebhooks((whs) => whs, true);
   };
 
+  const removeAllRewards = useCallback(() => {
+    fetch(`/api/rewards/remove?all=true`, { method: "DELETE" });
+
+    mutate([]);
+  }, []);
+
+  const removeReward = useCallback((reward: UserSubReward, idx: number) => {
+    fetch(`/api/rewards/remove?id=${reward.id}`, { method: "DELETE" });
+
+    mutate((currentRewards) => {
+      const copy = [...(currentRewards ?? [])];
+
+      copy.splice(idx, 1);
+
+      return copy;
+    }, true);
+  }, []);
+
   return (
     <div>
       <div>
@@ -193,11 +212,13 @@ export default function EditGoals(props: Props) {
         />
         <input type="submit" />
       </form>
-      {/* list all the current rewards in order of subCount */}
+      <button onClick={removeAllRewards}>Reset all rewards</button>
+      {/* use browser dialog? to confirm delete all */}
       <ul>
-        {data?.map((reward) => (
+        {data?.map((reward, idx) => (
           <li key={reward.id}>
-            For {reward.sub_count} subs you will give {reward.reward}
+            For {reward.sub_count} event you will {reward.reward}
+            <button onClick={() => removeReward(reward, idx)}>x</button>
           </li>
         ))}
       </ul>
@@ -257,12 +278,3 @@ export const getServerSideProps: GetServerSideProps =
       },
     };
   };
-
-function getTwitchEventFriendlyName(eventType: TwitchWebhookType) {
-  switch (eventType) {
-    case TwitchWebhookType.Follow:
-      return "Follows";
-    case TwitchWebhookType.Subscribe:
-      return "subs";
-  }
-}

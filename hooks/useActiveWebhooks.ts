@@ -25,6 +25,6 @@ async function fetcher(route: string, userId?: string) {
   return data;
 }
 
-export function useActiveWebhooks(userId?: string) {
+export function useActiveWebhooks(userId: string | undefined) {
   return useSWR<TwitchWebhookSub[]>(["/api/webhooks/list", userId], fetcher);
 }
