@@ -103,7 +103,9 @@ export function getUser(token: string): Promise<TwitchUser | undefined> {
   });
 }
 
-export async function verifyUserToken(token: string): Promise<boolean> {
+export async function verifyUserToken(
+  token: string
+): Promise<string | undefined> {
   const [validateError, response] = await until(() =>
     fetch("https://id.twitch.tv/oauth2/validate", {
       headers: {
@@ -113,16 +115,20 @@ export async function verifyUserToken(token: string): Promise<boolean> {
   );
 
   if (validateError != null || !response.ok) {
-    return false;
+    return undefined;
   }
 
   const [parseError, validateData] = await until(() => response.json());
 
   if (parseError != null || validateData == null) {
-    return false;
+    return undefined;
   }
 
-  return validateData.expires_in > 0;
+  if (validateData.expires_in <= 0) {
+    return undefined;
+  }
+
+  return validateData.login;
 }
 
 export async function removeWebhookSubscription(

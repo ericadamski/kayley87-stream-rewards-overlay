@@ -227,17 +227,23 @@ export default function EditGoals(props: Props) {
 }
 
 export const getServerSideProps: GetServerSideProps =
-  async function getServerSideProps(context) {
+  async function getServerSideProps({ params, req, res }) {
     const {
       headers: { cookie },
-    } = context.req;
+    } = req;
 
     const redirectHome = () => {
-      context.res.statusCode = 302;
-      context.res.setHeader("Location", "/");
+      res.statusCode = 302;
+      res.setHeader("Location", "/");
     };
 
     if (cookie == null) {
+      redirectHome();
+
+      return { props: {} };
+    }
+
+    if (params?.twitchId == null) {
       redirectHome();
 
       return { props: {} };
@@ -250,9 +256,9 @@ export const getServerSideProps: GetServerSideProps =
     try {
       const { t } = JSON.parse(__twtk);
 
-      const valid = await verifyUserToken(t);
+      const login = await verifyUserToken(t);
 
-      if (!valid) {
+      if (params.twitchId !== login) {
         redirectHome();
 
         return { props: {} };
