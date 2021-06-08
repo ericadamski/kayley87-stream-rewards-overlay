@@ -1,7 +1,7 @@
 import { GetServerSideProps } from "next";
 import styled from "styled-components";
 import { motion } from "framer-motion";
-import Router from "next/router";
+import Router, { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import ms from "ms";
 
@@ -30,6 +30,7 @@ interface Props {
 //  OR integrate ably websockets... not sure which one makes more sense. Maybe both?
 
 export default function UserPage(props: Props) {
+  const router = useRouter();
   const trackingMetric = useTrackingMetric(props.user?.id);
   const streamId = useLiveStreamId(props.user?.id);
   const [currentMetricCount, lastEvent] = useTackCurrentMetric(
@@ -45,6 +46,8 @@ export default function UserPage(props: Props) {
     initialData: props.rewards,
     refreshInterval: ms("10s"),
   });
+
+  const direction = router.query.d ?? "left";
 
   useEffect(() => {
     if (props.user == null) {
@@ -71,7 +74,12 @@ export default function UserPage(props: Props) {
   );
 
   return (
-    <ProgressContainer>
+    <ProgressContainer
+      style={{
+        left: direction === "l" ? 0 : undefined,
+        right: direction === "r" ? 0 : undefined,
+      }}
+    >
       <ProgressBar>
         {nextReward && (
           <>
@@ -85,6 +93,7 @@ export default function UserPage(props: Props) {
                   8
                 )}%`,
                 y: "-100%",
+                x: direction === "l" ? 0 : "-125%",
               }}
             >
               <p style={{ fontWeight: "normal", fontSize: "0.5rem" }}>
@@ -122,7 +131,13 @@ export default function UserPage(props: Props) {
           }}
         >
           {progress > 0 && (
-            <Detail style={{ minWidth: 120, textAlign: "center" }}>
+            <Detail
+              style={{
+                minWidth: 120,
+                textAlign: "center",
+                x: direction === "l" ? 0 : "-125%",
+              }}
+            >
               <p>
                 {metricFriendlyName}: {currentMetricCount}
               </p>
@@ -168,6 +183,7 @@ export const getServerSideProps: GetServerSideProps =
   };
 
 const ProgressContainer = styled.div`
+  position: fixed;
   box-sizing: border-box;
   height: 100vh;
   padding: 2rem;
