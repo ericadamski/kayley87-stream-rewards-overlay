@@ -1,5 +1,6 @@
 import { until } from "@open-draft/until";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+
 import type { TwitchUser, TwitchWebhookType } from "./twitch";
 
 let client: SupabaseClient;

@@ -190,6 +190,7 @@ const Line = styled(motion.div)<{ rewardAmount: number }>`
   height: 2px;
   width: 100%;
   background-color: white;
+
   &::before {
     position: absolute;
     top: -0.75rem;
@@ -211,7 +212,7 @@ const Detail = styled(motion.div)`
   left: 2rem;
   top: 0;
   color: white;
-  font-size: 0.65rem;
+  font-size: 1rem;
   font-weight: bold;
   letter-spacing: 0.025rem;
   min-width: 200px;

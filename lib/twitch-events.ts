@@ -1,5 +1,5 @@
-import { TwitchWebhookType } from "./twitch";
 import * as Supabase from "./supabase";
+import { TwitchWebhookType } from "./twitch";
 
 interface Subscription<T = TwitchWebhookType> {
   /**
@@ -52,7 +52,7 @@ interface UserStreamOnline extends WebhookEventData {
   started_at: string;
 }
 
-export function handleUserStreamOnlineEvent(
+export async function handleUserStreamOnlineEvent(
   event: TwitchWebhookEvent<UserStreamOnline, TwitchWebhookType.Online>
 ) {
   return Supabase.addNewUserLiveStream(event.event.broadcaster_user_id, {

@@ -103,6 +103,41 @@ export function getUser(token: string): Promise<TwitchUser | undefined> {
   });
 }
 
+export async function getUserByLogin(
+  token: string,
+  login: string
+): Promise<TwitchUser | undefined> {
+  const [getError, response] = await until(() =>
+    fetch(`${TWITCH_API_URL}/users?login=${login}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Client-Id": process.env.TWITCH_CLIENT_ID!,
+      },
+    })
+  );
+
+  if (getError != null || !response.ok) {
+    return undefined;
+  }
+
+  const [parseError, responseData] = await until(() => response.json());
+
+  if (parseError != null || (responseData?.data?.length ?? 0) < 1) {
+    return undefined;
+  }
+
+  const [{ displayName, offline_image_url, profile_image_url, id }] =
+    responseData.data;
+
+  return {
+    displayName,
+    imageUrl:
+      profile_image_url.length > 0 ? profile_image_url : offline_image_url,
+    id,
+    login,
+  };
+}
+
 export async function verifyUserToken(
   token: string
 ): Promise<string | undefined> {
@@ -177,15 +212,6 @@ export async function createWebhookSubscription(
   );
 
   if (createRequestError != null || !response.ok) {
-    console.log({
-      createRequestError,
-      response,
-      b: await response.text(),
-      userId,
-      token,
-      id: process.env.TWITCH_CLIENT_ID,
-      type,
-    });
     return false;
   }
 
