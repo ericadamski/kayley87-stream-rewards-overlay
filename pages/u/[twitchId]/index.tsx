@@ -41,7 +41,7 @@ export default function UserPage(props: Props) {
 
   const actualMetricCount =
     props.user?.id === "190420931"
-      ? 67 + currentMetricCount
+      ? 74 + currentMetricCount
       : currentMetricCount;
   const [nextReward, setNextReward] = useState<UserSubReward>();
   const [remainingRewards, setRemainingRewards] = useState<UserSubReward[]>(
