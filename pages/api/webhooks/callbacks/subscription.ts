@@ -4,6 +4,7 @@ import { sha256 } from "js-sha256";
 import * as Supabase from "lib/supabase";
 import type { TwitchWebhookType } from "lib/twitch";
 import { handleWebhookEvent, TwitchWebhookEvent } from "lib/twitch-events";
+import { Remote } from "lib/logger";
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
   // N.B Enable CORS
@@ -25,6 +26,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
   try {
     verifyRequestFromTwitch(req, body);
   } catch {
+    Remote.log("Could not verify the request came from Twitch.");
     return res.status(403).end();
   }
 
@@ -38,12 +40,14 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
   ));
 
   if (alreadySeen) {
+    Remote.log("We have already seen this event");
     return res.end();
   }
 
   const contentType = headers["content-type"];
 
   if (contentType !== "application/json") {
+    Remote.log("The request body is not application/json");
     return res.status(400).end();
   }
 
@@ -54,6 +58,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
   } catch {
     // The body should be JSON, if it isn't I don't know how to handle it
     // anyway.
+    Remote.log("There was an issue parsing the request body as json");
     return res.status(400).end();
   }
 
@@ -85,6 +90,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     );
 
     if (hook && hook.id === id) {
+      Remote.log("Sending back initial verify challenge");
       return res.end(challenge);
     }
 
@@ -103,11 +109,17 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
 
     await Supabase.removeUserWebhookSubscription(id);
 
+    Remote.log("Revoking webhook");
+
     return res.end();
   }
 
   // Finally handle the notification
   // N.B Will ignore any events while a stream is offline.
+  Remote.log(
+    "Handling webhook " + (bodyAsObj as TwitchWebhookEvent).subscription.type,
+    bodyAsObj
+  );
   await handleWebhookEvent(bodyAsObj as TwitchWebhookEvent);
 
   res.end();
