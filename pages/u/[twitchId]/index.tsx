@@ -38,6 +38,11 @@ export default function UserPage(props: Props) {
     streamId,
     trackingMetric
   );
+
+  const actualMetricCount =
+    props.user?.id === "190420931"
+      ? 67 + currentMetricCount
+      : currentMetricCount;
   const [nextReward, setNextReward] = useState<UserSubReward>();
   const [remainingRewards, setRemainingRewards] = useState<UserSubReward[]>(
     props.rewards ?? []
@@ -56,10 +61,10 @@ export default function UserPage(props: Props) {
   }, []);
 
   useEffect(() => {
-    const [next, remianing] = getNextReward(currentMetricCount, allRewards);
+    const [next, remianing] = getNextReward(actualMetricCount, allRewards);
     setNextReward(next);
     setRemainingRewards(remianing);
-  }, [currentMetricCount, allRewards]);
+  }, [actualMetricCount, allRewards]);
 
   if (props.user == null) {
     return null;
@@ -67,7 +72,7 @@ export default function UserPage(props: Props) {
 
   const maxReward = sortBy((r) => r.sub_count, allRewards).pop();
   const singleStep = 1 / (maxReward?.sub_count ?? 1);
-  const progress = currentMetricCount * singleStep * 100;
+  const progress = actualMetricCount * singleStep * 100;
 
   const metricFriendlyName = getTwitchEventFriendlyName(
     trackingMetric as TwitchWebhookType
@@ -139,7 +144,7 @@ export default function UserPage(props: Props) {
               }}
             >
               <p>
-                {metricFriendlyName}: {currentMetricCount}
+                {metricFriendlyName}: {actualMetricCount}
               </p>
             </Detail>
           )}
