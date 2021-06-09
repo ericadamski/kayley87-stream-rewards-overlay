@@ -332,6 +332,43 @@ export function addTwitchUserEvent(
   );
 }
 
+export async function bulkAddUserEvents(events: Omit<TwitchUserEvent, "id">[]) {
+  const base = getClientInstance();
+
+  const [error] = await until(async () =>
+    base.from<TwitchUserEvent>("twitch_user_events").insert(events)
+  );
+
+  return error == null;
+}
+
+export async function getAllUserEventDataFor(
+  userId: string,
+  streamId: string,
+  eventType: TwitchWebhookType
+): Promise<{ count: number; events?: TwitchUserEvent[] }> {
+  const base = getClientInstance();
+
+  const [error, records] = await until(async () =>
+    base
+      .from<TwitchUserEvent>("twitch_user_events")
+      .select("*", { count: "exact" })
+      .eq("user_id", userId)
+      .eq("stream_id", streamId)
+      .eq("event_type", eventType)
+      .order("created_at")
+  );
+
+  if (error != null || records.data == null) {
+    return { count: 0 };
+  }
+
+  return {
+    count: records.count ?? 0,
+    events: records.data,
+  };
+}
+
 export async function getAllUserEventsFor(
   userId: string,
   streamId: string,

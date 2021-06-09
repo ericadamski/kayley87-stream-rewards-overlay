@@ -138,6 +138,32 @@ export async function getUserByLogin(
   };
 }
 
+export async function getLast100SubsForUser(
+  token: string,
+  user: TwitchUser
+): Promise<{ user_id: string; user_login: string; user_name: string }[] | []> {
+  const [getError, response] = await until(() =>
+    fetch(`${TWITCH_API_URL}/subscriptions?broadcaster_id=${user.id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Client-Id": process.env.TWITCH_CLIENT_ID!,
+      },
+    })
+  );
+
+  if (getError != null || !response.ok) {
+    return [];
+  }
+
+  const [parseError, responseData] = await until(() => response.json());
+
+  if (parseError != null || (responseData?.data?.length ?? 0) < 1) {
+    return [];
+  }
+
+  return responseData.data;
+}
+
 export async function verifyUserToken(
   token: string
 ): Promise<string | undefined> {
